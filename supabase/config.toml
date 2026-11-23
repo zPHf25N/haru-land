@@ -1,0 +1,7 @@
+project_id = "haru-land"
+
+[db]
+major_version = 17
+
+[db.seed]
+enabled = false
