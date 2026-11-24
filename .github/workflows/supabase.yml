@@ -1,0 +1,75 @@
+name: Supabase backend
+
+on:
+  push:
+    branches: [main]
+  pull_request:
+
+permissions:
+  contents: read
+
+jobs:
+  backend:
+    runs-on: ubuntu-latest
+    timeout-minutes: 20
+    steps:
+      - uses: actions/checkout@v4
+      - uses: supabase/setup-cli@v1
+        with:
+          version: 3.3.0
+      - name: Start Supabase with Auth and PostgREST
+        run: supabase start -x realtime,storage-api,imgproxy,postgres-meta,studio,edge-runtime,logflare,vector,supavisor
+      - name: Apply migrations from scratch
+        run: supabase db reset
+      - name: Test database rules
+        run: supabase test db
+      - name: Test signup and diary API
+        shell: bash
+        run: |
+          supabase status -o json | python3 -c '
+          import json, sys, urllib.error, urllib.request
+
+          config = json.load(sys.stdin)
+          base = config["API_URL"].rstrip("/")
+          key = config.get("PUBLISHABLE_KEY") or config["ANON_KEY"]
+
+          def request(path, data=None, token=None, expected=None):
+              headers = {"apikey": key, "Content-Type": "application/json"}
+              if token:
+                  headers["Authorization"] = "Bearer " + token
+              body = None if data is None else json.dumps(data).encode()
+              req = urllib.request.Request(base + path, data=body, headers=headers)
+              try:
+                  with urllib.request.urlopen(req, timeout=30) as result:
+                      assert expected is None, f"Expected HTTP {expected} for {path}"
+                      raw = result.read()
+                      return json.loads(raw) if raw else None
+              except urllib.error.HTTPError as error:
+                  if error.code != expected:
+                      raise AssertionError(f"{path} returned HTTP {error.code}: {error.read().decode()}") from None
+
+          def signup(name):
+              return request("/auth/v1/signup", {
+                  "email": f"{name}@example.com",
+                  "password": "local-test-password-123",
+              })["access_token"]
+
+          first = signup("first")
+          second = signup("second")
+          start, = request("/rest/v1/villages?select=level,total_xp", token=first)
+          assert start == {"level": 1, "total_xp": 0}, start
+          diary = request("/rest/v1/rpc/create_diary", {
+              "p_entry_date": "2026-11-24", "p_content": "시험 공부",
+          }, first)
+          assert diary["revision"] == 1, diary
+          analysis = {"p_id": diary["id"], "p_expected_revision": 1}
+          request("/rest/v1/rpc/analyze_diary", analysis, second, expected=404)
+          assert request("/rest/v1/diary_entries?select=id", token=second) == []
+          result = request("/rest/v1/rpc/analyze_diary", analysis, first)
+          assert result["analysis_source"] == "mock", result
+          activities = request("/rest/v1/diary_entries?select=diary_activities(activity_type)", token=first)
+          assert activities == [{"diary_activities": [{"activity_type": "study"}]}], activities
+          growth, = request("/rest/v1/villages?select=level,total_xp", token=first)
+          assert growth == {"level": 2, "total_xp": 10}, growth
+          print("Signup, JWT, diary RPC, analysis, growth, and account isolation passed.")
+          '
