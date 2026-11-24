@@ -58,15 +58,15 @@ haru-land/
 
 ## 백엔드 로컬 실행
 
-Docker와 [Supabase CLI](https://supabase.com/docs/guides/local-development/cli/getting-started)를 설치하고 저장소 루트에서 실행합니다.
+Docker와 [Supabase CLI 3.x](https://supabase.com/docs/guides/local-development/cli/getting-started)를 설치하고 저장소 루트에서 실행합니다.
 
 ```sh
 supabase start
-supabase db reset --local
+supabase db reset
 supabase test db
 ```
 
-`db reset --local`은 로컬 데이터를 초기화하고 마이그레이션을 다시 적용합니다. 테스트는 테스트용 계정을 만들어 권한, 일기 변경, 분석과 마을 성장 규칙을 검증한 뒤 롤백합니다.
+`db reset`은 로컬 데이터를 초기화하고 마이그레이션을 다시 적용합니다. SQL 테스트는 테스트용 계정을 만들어 권한, 일기 변경, 분석과 마을 성장 규칙을 검증한 뒤 롤백합니다. GitHub Actions에서는 Supabase를 실행해 SQL 테스트와 실제 Auth·일기 API 호출을 확인합니다.
 
 `supabase status`에 표시되는 로컬 API URL과 공개용 키로 클라이언트를 만들고, 이메일과 비밀번호로 회원가입·로그인합니다. 이메일 확인이 필요한 경우 로컬 메일함을 사용합니다. 가입 시 프로필, 마을, 건물 및 구역 행이 생기며, 마이그레이션은 기존 Auth 사용자에게도 초기 행을 생성합니다.
 
@@ -106,7 +106,7 @@ supabase test db
 
 실제 모델을 연동할 때는 사용자 JWT를 검증하는 서버 또는 Supabase Edge Function에서 본인 일기를 읽고, 모델 결과를 허용된 태그로 검증한 뒤 해당 일기의 버전을 확인하며 저장합니다. 모델 출처를 구분하려면 DB에 서버 전용 저장 경로와 출처 값을 추가합니다. AI API 키와 Supabase 서비스 역할 키는 서버 환경 변수에 보관합니다. 브라우저에서는 프로젝트 URL, 공개용 키, 로그인 세션을 사용합니다.
 
-호스팅 연결 정보가 준비되면 `supabase link --project-ref <project-ref>`, `supabase db push --dry-run`으로 대상과 적용 내용을 확인한 뒤 `supabase db push`로 적용합니다. 이 초기 구현은 호스팅된 Supabase에 배포되지 않았습니다.
+호스팅 연결 정보가 준비되면 `supabase link --project-ref <project-ref>`, `supabase db push --remote --dry-run`으로 대상과 적용 내용을 확인한 뒤 `supabase db push --remote`로 적용합니다. 이 초기 구현은 호스팅된 Supabase에 배포되지 않았습니다.
 
 ## 개발 일정 (계획)
 
